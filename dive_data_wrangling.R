@@ -8,9 +8,9 @@
 pacman::p_load(dplyr, ggplot2, RchivalTag, suncalc, lubridate)
 
 #load the dive counts data
-histos_data <- read.csv("Data/172446-Histos.csv")
-#dive_data <- dir(pattern = "*-Histos.csv", recursive = T) %>% 
-  #purrr::map_dfr(read.csv) %>% bind_rows()
+#histos_data <- read.csv("Data/Test_data/172446-Histos.csv")
+histos_data <- dir(pattern = "*-Histos.csv", recursive = T) %>% 
+  purrr::map_dfr(read.csv) %>% bind_rows()
 
 #reformat the histos data to get percent time above 2m 
 histos_data_reform <- histos_data %>% 
@@ -36,11 +36,20 @@ histos_data_reform <- histos_data %>%
                                Depth_Bin == "Bin11" ~ 500,
                                Depth_Bin == "Bin12" ~ 750,
                                Depth_Bin == "Bin13" ~ 1000,
-                               Depth_Bin == "Bin14" ~ 2000)) %>% 
-  filter(Depth_Bin %in% c(0,2))
+                               Depth_Bin == "Bin14" ~ 2000)) 
 
-#make sure to only select time bins when they were foraging in each area
-TAD_data <- dive_data_reform %>% 
+#make sure to filter out instances of possible mortality or tag detachment
+#plot out TAD both above and below 2 m
+histos_data_reform %>% 
+  filter(!Depth_Bin %in% c(0,2)) %>% tidyr::drop_na(Count) %>% 
+  group_by(DeployID, datetime) %>% 
+  summarise(tad_below_2 = sum(Count)) %>% 
+  ggplot(., aes(x=datetime, y = tad_below_2)) +
+  geom_line() + facet_wrap(~DeployID, scales = "free")
+
+
+#make sure to only diurnal time bins 
+TAD_data <- histos_data_reform %>% 
   mutate(hours = hour(datetime)) %>% 
   mutate(tperiod = case_when(hours == 0 ~ "20:00 - 2:00",
                              hours == 6 ~ "2:00 - 8:00",
@@ -52,9 +61,12 @@ TAD_data <- dive_data_reform %>%
   group_by(datetime, DeployID) %>% 
   summarise(TAD = sum(Count))
 
+#plot out distribution
 hist(TAD_data$TAD, breaks = 100)
 
 
+
+## Get Average Surface and Dive Duration ## 
 #load behavior data
 behavior_data <- read.csv("Data/172446-Behavior.csv")
 str(behavior_data)
