@@ -68,25 +68,29 @@ hist(TAD_data$TAD, breaks = 100)
 
 ## Get Average Surface and Dive Duration ## 
 #load behavior data
-behavior_data <- read.csv("Data/172446-Behavior.csv")
+#behavior_data <- read.csv("Data/172446-Behavior.csv")
+behavior_data <- dir(pattern = "*-Behavior.csv", recursive = T) %>% 
+  purrr::map_dfr(read.csv) %>% bind_rows()
 str(behavior_data)
 
 #load location data
-location_data <- read.csv("Data/post172446_interpolated.csv")
+#location_data <- read.csv("Data/post172446_interpolated.csv")
+location_data <- dir(pattern = "*_interpolated.csv", recursive=T) %>% 
+  purrr::map_dfr(readr::read_csv) %>% bind_rows()
 str(location_data)
 
 daily_locs <- location_data %>% 
-  mutate(date = as.POSIXct(date)) %>% 
+  mutate(date = as.Date(date)) %>% 
   group_by(id, date) %>% 
   summarise(lat = mean(y), lon = mean(x)) %>% 
-  mutate(date = as.Date(date))
+  rename(DeployID = id)
 
 #calculate average surface duration for diurnal activity
 formatted_behavior_data <- behavior_data %>% 
   filter(What %in% c("Surface", "Dive")) %>%
   select(DeployID, What, Start, End, Shallow, DurationMin, DurationMax) %>% 
   mutate(date = as.Date(End, format= "%H:%M:%S %d-%b-%Y")) %>% 
-  left_join(., daily_locs, by = "date") 
+  left_join(., daily_locs, by = c("date", "DeployID")) 
 
 #join sunset and sunriese times to dive behavior  
 diel_periods <- getSunlightTimes(data = formatted_behavior_data, keep = c("sunrise", "sunset"))
@@ -100,10 +104,10 @@ behavior_day<-behavior_diel %>% mutate(end_datetime = as.POSIXct(End, format= "%
   filter(diel_period == "day") 
 
 #plot out distribution of surface time
-hist(behavior_day$Shallow, breaks = 100)
+hist(behavior_day$Shallow, breaks = 1000)
 
 #plot out distribution of dive time 
-hist(behavior_day$DurationMax[behavior_day$What == "Dive"], breaks = 100)
+hist(behavior_day$DurationMax[behavior_day$What == "Dive"], breaks = 1000)
 
 
 
